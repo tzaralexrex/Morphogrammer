@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Перекодировщик похожих букв</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #f5f5f5;
+  }
+  h1 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+  .row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .col {
+    flex: 1 1 300px;
+    min-width: 0;
+  }
+  textarea {
+    width: 100%;
+    height: 200px;
+    box-sizing: border-box;
+    resize: vertical;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 14px;
+  }
+  #dst {
+    background: #fafafa;
+  }
+  .controls {
+    margin: 0.5rem 0 0.5rem 0;
+  }
+  .controls label {
+    margin-right: 1rem;
+    white-space: nowrap;
+  }
+  button {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 800px;
+    background: white;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 0.2rem 0.3rem;
+    text-align: center;
+  }
+  th {
+    background: #eee;
+  }
+  select.map-select {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 13px;
+  }
+  .small {
+    font-size: 0.8rem;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<h1>Перекодировщик похожих букв (латиница / кириллица / греческий / иврит)</h1>
+
+<div class="row">
+  <div class="col">
+    <h2>Исходный текст</h2>
+    <textarea id="src" autocomplete="off" placeholder="Введите текст для перекодирования..."></textarea>
+  </div>
+  <div class="col">
+    <h2>Результат</h2>
+    <textarea id="dst" autocomplete="off" readonly placeholder="Результат появится здесь"></textarea>
+  </div>
+</div>
+
+<div class="controls">
+  <label><input type="checkbox" id="cb-greek"> Греческий</label>
+  <label><input type="checkbox" id="cb-hebrew"> Иврит</label>
+  <button id="btn-run">Перекодировать</button>
+  <!--
+    Кнопка обмена текстом местами (ввод ↔ вывод).
+    Сейчас не используется, оставлена закомментированной на будущее.
+
+    <button id="btn-swap">Поменять местами текст</button>
+  -->
+  <button id="btn-reset">Сброс</button>
+</div>
+
+<h2>Таблица соответствий (одна строка)</h2>
+<p class="small">
+- Первый столбец: буква кириллицы (базовая).<br>
+- Остальные столбцы показывают/задают соответствующие латинские, греческие и ивритские буквы для текущей таблицы перекодирования.<br>
+- При выборе кириллической буквы остальные столбцы подставляются из текущей таблицы соответствий.<br>
+- При выборе буквы в любом другом столбце она сохраняется как соответствие для текущей кириллической буквы.
+</p>
+
+<table id="map-table">
+  <thead>
+    <tr>
+      <th>Кириллица</th>
+      <th>Латиница</th>
+      <th>Греческий</th>
+      <th>Иврит</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><select id="sel-cyr"  class="map-select" autocomplete="off"></select></td>
+      <td><select id="sel-lat"  class="map-select" autocomplete="off"></select></td>
+      <td><select id="sel-gr"   class="map-select" autocomplete="off"></select></td>
+      <td><select id="sel-he"   class="map-select" autocomplete="off"></select></td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+// ===== Алфавиты =====
+
+const alphabetCyr = [
+  "",
+  "А","Б","В","Г","Д","Е","Ё","Ж","З","И","Й","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Щ","Ъ","Ы","Ь","Э","Ю","Я",
+  "а","б","в","г","д","е","ё","ж","з","и","й","к","л","м","н","о","п","р","с","т","у","ф","х","ц","ч","ш","щ","ъ","ы","ь","э","ю","я"
+];
+
+const alphabetLat = [
+  "",
+  "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+  "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
+];
+
+const alphabetGr = [
+  "",
+  "Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω",
+  "α","β","γ","δ","ε","ζ","η","θ","ι","κ","λ","μ","ν","ξ","ο","π","ρ","σ","ς","τ","υ","φ","χ","ψ","ω"
+];
+
+const alphabetHe = [
+  "",
+  "א","ב","ג","ד","ה","ו","ז","ח","ט","י","כ","ל","מ","נ","ס","ע","פ","צ","ק","ר","ש","ת"
+];
+
+// ===== База латиницы для кириллицы (для добавления лат по умолчанию) =====
+
+const baseLatForCyr = {
+  "А":"A","Б":"", "В":"B", "Г":"", "Д":"", "Е":"E","Ё":"E","Ж":"",
+  "З":"", "И":"", "Й":"", "К":"K","Л":"", "М":"M","Н":"H","О":"O",
+  "П":"", "Р":"P","С":"C","Т":"T","У":"Y","Ф":"", "Х":"X","Ц":"",
+  "Ч":"", "Ш":"", "Щ":"", "Ъ":"", "Ы":"", "Ь":"", "Э":"", "Ю":"", "Я":"",
+  "а":"a","б":"", "в":"", "г":"", "д":"", "е":"e","ё":"e","ж":"",
+  "з":"", "и":"u","й":"", "к":"k","л":"", "м":"", "н":"", "о":"o",
+  "п":"n","р":"p","с":"c","т":"m","у":"y","ф":"", "х":"x","ц":"",
+  "ч":"", "ш":"", "щ":"", "ъ":"", "ы":"", "ь":"", "э":"", "ю":"", "я":""
+};
+
+// ===== referenceMap по умолчанию (точно по таблице соответствий) =====
+
+const defaultReferenceMap = (function() {
+  const m = Object.create(null);
+  const set = (cyr, lat, gr, he) => {
+    m[cyr] = { lat: lat || "", gr: gr || "", he: he || "" };
+  };
+
+  // Заглавные
+  set("А","A","Α","");
+  set("Б","","","");
+  set("В","B","","");
+  set("Г","","Γ","");
+  set("Д","","Δ","");
+  set("Е","E","Ε","");
+  set("Ё","E","Ε","");
+  set("Ж","","","");
+  set("З","","","");
+  set("И","","","");
+  set("Й","","","");      // всё "-"
+  set("К","K","Κ","");
+  set("Л","","Λ","");
+  set("М","M","Μ","");
+  set("Н","H","","");
+  set("О","O","Ο","ס");
+  set("П","","Π","ח");
+  set("Р","P","Ρ","ק");
+  set("С","C","","","");
+  set("Т","T","Τ","");
+  set("У","Y","Υ","");
+  set("Ф","","Φ","");
+  set("Х","X","Χ","");
+  set("Ц","","","");
+  set("Ч","","","");
+  set("Ш","","","ש");
+  set("Щ","","","");
+  set("Ъ","","","");
+  set("Ы","","","");
+  set("Ь","","","");
+  set("Э","","","");
+  set("Ю","","","");
+  set("Я","","","");
+
+  // Строчные
+  set("а","a","α","");
+  set("б","","δ","");
+  set("в","","β","");
+  set("г","","","");
+  set("д","","","");
+  set("е","e","ε","");
+  set("ё","e","ε","");
+  set("ж","","","");
+  set("з","","","");
+  set("и","u","υ","υ");
+  set("й","","","");      // все "-"
+  set("к","k","κ","");
+  set("л","","λ","ג");
+  set("м","","μ","");
+  set("н","","","א");
+  set("о","o","ο","ס");
+  set("п","n","π","ח");
+  set("р","p","ρ","ק");
+  set("с","c","ς","");
+  set("т","m","τ","");
+  set("у","y","γ","ע");
+  set("ф","","φ","");
+  set("х","x","χ","");
+  set("ц","","","");
+  set("ч","","","");
+  set("ш","","ω","ש");
+  set("щ","","","");
+  set("ъ","","","");
+  set("ы","","","");
+  set("ь","","","");
+  set("э","","","");
+  set("ю","","","");
+  set("я","","","");
+
+  return m;
+})();
+
+// ===== Текущее состояние соответствий и таблицы перекодирования =====
+
+let referenceMap = {};
+let transformMap = {};
+
+const srcTA    = document.getElementById("src");
+const dstTA    = document.getElementById("dst");
+const cbGreek  = document.getElementById("cb-greek");
+const cbHebrew = document.getElementById("cb-hebrew");
+
+const selCyr = document.getElementById("sel-cyr");
+const selLat = document.getElementById("sel-lat");
+const selGr  = document.getElementById("sel-gr");
+const selHe  = document.getElementById("sel-he");
+
+// ===== Helpers =====
+
+function fillSelect(sel, alphabet) {
+  sel.innerHTML = "";
+  alphabet.forEach(ch => {
+    const opt = document.createElement("option");
+    opt.value = ch;
+    opt.textContent = ch === "" ? "—" : ch;
+    sel.appendChild(opt);
+  });
+}
+
+function setSelectValue(sel, ch) {
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === ch) {
+      sel.selectedIndex = i;
+      return;
+    }
+  }
+  sel.selectedIndex = 0;
+}
+
+function cloneReferenceMap(src) {
+  const out = Object.create(null);
+  for (const k in src) {
+    if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
+    const v = src[k];
+    out[k] = { lat: v.lat || "", gr: v.gr || "", he: v.he || "" };
+  }
+  return out;
+}
+
+function initReferenceMapDefaults() {
+  referenceMap = cloneReferenceMap(defaultReferenceMap);
+
+  // Дополнительно: если буквы нет в defaultReferenceMap, но есть базовая латиница, добавляем её.
+  for (const cyr of alphabetCyr) {
+    if (!cyr) continue;
+    if (referenceMap[cyr]) continue;
+    const lat = baseLatForCyr[cyr] || "";
+    if (lat) {
+      referenceMap[cyr] = { lat, gr:"", he:"" };
+    }
+  }
+}
+
+// ===== Построение transformMap по логике чекбоксов =====
+//
+// Приоритет:
+// 1) если включён Иврит и есть he → he
+// 2) иначе если включён Греческий и есть gr → gr
+// 3) иначе если есть lat → lat
+// 4) иначе без замены
+
+function rebuildTransformMap() {
+  transformMap = Object.create(null);
+  const useGreek  = cbGreek.checked;
+  const useHebrew = cbHebrew.checked;
+
+  for (const cyr of alphabetCyr) {
+    if (!cyr) continue;
+    const ref = referenceMap[cyr] || { lat:"", gr:"", he:"" };
+    let target = "";
+
+    if (useHebrew && ref.he) {
+      target = ref.he;
+    } else if (useGreek && ref.gr) {
+      target = ref.gr;
+    } else if (ref.lat) {
+      target = ref.lat;
+    } else {
+      target = "";
+    }
+
+    transformMap[cyr] = target;
+  }
+}
+
+// ===== Добавление LRM к группам подряд идущих ивритских букв (2+ символа) =====
+
+function isHebrewChar(ch) {
+  if (!ch) return false;
+  const code = ch.codePointAt(0);
+  return code >= 0x0590 && code <= 0x05FF;
+}
+
+function addLrmToHebrewRuns(text) {
+  const LRM = "\u200E";
+  let result = "";
+  let run = "";
+
+  function flushRun() {
+    if (!run) return;
+    if (run.length <= 1) {
+      result += run;
+    } else {
+      for (let i = 0; i < run.length; i++) {
+        result += LRM + run[i];
+      }
+    }
+    run = "";
+  }
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (isHebrewChar(ch)) {
+      run += ch;
+    } else {
+      flushRun();
+      result += ch;
+    }
+  }
+  flushRun();
+  return result;
+}
+
+// Перекодирование текста с использованием transformMap
+
+function runTransform() {
+  const text = srcTA.value;
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const repl = transformMap[ch] || "";
+    if (repl) {
+      out += repl;
+    } else {
+      out += ch;
+    }
+  }
+  // Вставляем LRM только для групп ивритских букв длиной ≥ 2.
+  out = addLrmToHebrewRuns(out);
+  dstTA.value = out;
+}
+
+// ===== Логика селектов =====
+
+// При выборе кириллической буквы:
+// остальные столбцы получают значения из referenceMap для этой буквы.
+function onCyrSelectChange() {
+  const cyr = selCyr.value;
+  if (!cyr) {
+    setSelectValue(selLat, "");
+    setSelectValue(selGr,  "");
+    setSelectValue(selHe,  "");
+    return;
+  }
+  const ref = referenceMap[cyr] || { lat:"", gr:"", he:"" };
+  setSelectValue(selLat, ref.lat || "");
+  setSelectValue(selGr,  ref.gr  || "");
+  setSelectValue(selHe,  ref.he  || "");
+}
+
+// При выборе лат/гр/иврита:
+// обновляем только соответствующее поле для активной кириллической буквы,
+// потом заново строим transformMap.
+function onLatGrHeSelectChange(script) {
+  const cyr = selCyr.value;
+  if (!cyr) return;
+
+  if (!referenceMap[cyr]) {
+    referenceMap[cyr] = { lat:"", gr:"", he:"" };
+  }
+  const ref = referenceMap[cyr];
+
+  if (script === "lat") {
+    ref.lat = selLat.value || "";
+  } else if (script === "gr") {
+    ref.gr  = selGr.value || "";
+  } else if (script === "he") {
+    ref.he  = selHe.value || "";
+  }
+
+  rebuildTransformMap();
+}
+
+// ===== Сброс =====
+
+function resetAll() {
+  srcTA.value = "";
+  dstTA.value = "";
+
+  cbGreek.checked  = false;
+  cbHebrew.checked = false;
+
+  setSelectValue(selCyr, "");
+  setSelectValue(selLat, "");
+  setSelectValue(selGr,  "");
+  setSelectValue(selHe,  "");
+
+  initReferenceMapDefaults();
+  rebuildTransformMap();
+}
+
+// ===== Инициализация и обработчики =====
+
+document.getElementById("btn-run").addEventListener("click", runTransform);
+
+// Кнопка обмена текстом закомментирована выше, обработчик не нужен.
+
+// document.getElementById("btn-swap").addEventListener("click", () => {
+//   const a = srcTA.value;
+//   srcTA.value = dstTA.value;
+//   dstTA.value = a;
+// });
+
+document.getElementById("btn-reset").addEventListener("click", resetAll);
+
+cbGreek.addEventListener("change", rebuildTransformMap);
+cbHebrew.addEventListener("change", rebuildTransformMap);
+
+selCyr.addEventListener("change", onCyrSelectChange);
+selLat.addEventListener("change", () => onLatGrHeSelectChange("lat"));
+selGr.addEventListener("change",  () => onLatGrHeSelectChange("gr"));
+selHe.addEventListener("change",  () => onLatGrHeSelectChange("he"));
+
+function init() {
+  fillSelect(selCyr, alphabetCyr);
+  fillSelect(selLat, alphabetLat);
+  fillSelect(selGr,  alphabetGr);
+  fillSelect(selHe,  alphabetHe);
+
+  srcTA.value = "";
+  dstTA.value = "";
+  cbGreek.checked  = false;
+  cbHebrew.checked = false;
+  setSelectValue(selCyr, "");
+  setSelectValue(selLat, "");
+  setSelectValue(selGr,  "");
+  setSelectValue(selHe,  "");
+
+  initReferenceMapDefaults();
+  rebuildTransformMap();
+}
+
+init();
+</script>
+
+</body>
+</html>
