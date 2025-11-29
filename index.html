@@ -49,7 +49,7 @@
   table {
     border-collapse: collapse;
     width: 100%;
-    max-width: 800px;
+    max-width: 900px;
     background: white;
   }
   th, td {
@@ -74,7 +74,7 @@
 </head>
 <body>
 
-<h1>Перекодировщик похожих букв (латиница / кириллица / греческий / иврит)</h1>
+<h1>Перекодировщик похожих букв (латиница / кириллица / греческий / иврит / цифры)</h1>
 
 <div class="row">
   <div class="col">
@@ -88,6 +88,7 @@
 </div>
 
 <div class="controls">
+  <label><input type="checkbox" id="cb-digits"> Цифры</label>
   <label><input type="checkbox" id="cb-greek"> Греческий</label>
   <label><input type="checkbox" id="cb-hebrew"> Иврит</label>
   <button id="btn-run">Перекодировать</button>
@@ -103,9 +104,9 @@
 <h2>Таблица соответствий (одна строка)</h2>
 <p class="small">
 - Первый столбец: буква кириллицы (базовая).<br>
-- Остальные столбцы показывают/задают соответствующие латинские, греческие и ивритские буквы для текущей таблицы перекодирования.<br>
+- Остальные столбцы показывают/задают соответствующие латинские, греческие, ивритские буквы и цифру для текущей таблицы перекодирования.<br>
 - При выборе кириллической буквы остальные столбцы подставляются из текущей таблицы соответствий.<br>
-- При выборе буквы в любом другом столбце она сохраняется как соответствие для текущей кириллической буквы.
+- При выборе буквы или цифры в любом другом столбце она сохраняется как соответствие для текущей кириллической буквы.
 </p>
 
 <table id="map-table">
@@ -115,6 +116,7 @@
       <th>Латиница</th>
       <th>Греческий</th>
       <th>Иврит</th>
+      <th>Цифры</th>
     </tr>
   </thead>
   <tbody>
@@ -123,12 +125,13 @@
       <td><select id="sel-lat"  class="map-select" autocomplete="off"></select></td>
       <td><select id="sel-gr"   class="map-select" autocomplete="off"></select></td>
       <td><select id="sel-he"   class="map-select" autocomplete="off"></select></td>
+      <td><select id="sel-digit" class="map-select" autocomplete="off"></select></td>
     </tr>
   </tbody>
 </table>
 
 <script>
-// ===== Алфавиты =====
+// ===== Алфавиты =====[web:138][web:137]
 
 const alphabetCyr = [
   "",
@@ -153,6 +156,11 @@ const alphabetHe = [
   "א","ב","ג","ד","ה","ו","ז","ח","ט","י","כ","ל","מ","נ","ס","ע","פ","צ","ק","ר","ש","ת"
 ];
 
+const digitsList = [
+  "",
+  "0","1","2","3","4","5","6","7","8","9"
+];
+
 // ===== База латиницы для кириллицы (для добавления лат по умолчанию) =====
 
 const baseLatForCyr = {
@@ -166,83 +174,83 @@ const baseLatForCyr = {
   "ч":"", "ш":"", "щ":"", "ъ":"", "ы":"", "ь":"", "э":"", "ю":"", "я":""
 };
 
-// ===== referenceMap по умолчанию (точно по таблице соответствий) =====
+// ===== referenceMap по умолчанию (точно по таблице соответствий + цифры) =====
 
 const defaultReferenceMap = (function() {
   const m = Object.create(null);
-  const set = (cyr, lat, gr, he) => {
-    m[cyr] = { lat: lat || "", gr: gr || "", he: he || "" };
+  const set = (cyr, lat, gr, he, digit) => {
+    m[cyr] = { lat: lat || "", gr: gr || "", he: he || "", digit: digit || "" };
   };
 
   // Заглавные
-  set("А","A","Α","");
-  set("Б","","","");
-  set("В","B","","");
-  set("Г","","Γ","");
-  set("Д","","Δ","");
-  set("Е","E","Ε","");
-  set("Ё","E","Ε","");
-  set("Ж","","","");
-  set("З","","","");
-  set("И","","","");
-  set("Й","","","");      // всё "-"
-  set("К","K","Κ","");
-  set("Л","","Λ","");
-  set("М","M","Μ","");
-  set("Н","H","","");
-  set("О","O","Ο","ס");
-  set("П","","Π","ח");
-  set("Р","P","Ρ","ק");
-  set("С","C","","","");
-  set("Т","T","Τ","");
-  set("У","Y","Υ","");
-  set("Ф","","Φ","");
-  set("Х","X","Χ","");
-  set("Ц","","","");
-  set("Ч","","","");
-  set("Ш","","","ש");
-  set("Щ","","","");
-  set("Ъ","","","");
-  set("Ы","","","");
-  set("Ь","","","");
-  set("Э","","","");
-  set("Ю","","","");
-  set("Я","","","");
+  set("А","A","Α","", "");
+  set("Б","","","", "6");
+  set("В","B","", "", "8");
+  set("Г","","Γ","", "");
+  set("Д","","Δ","", "");
+  set("Е","E","Ε","", "");
+  set("Ё","E","Ε","", "");
+  set("Ж","","","", "");
+  set("З","","","", "3");
+  set("И","","","", "");
+  set("Й","","","", "");
+  set("К","K","Κ","", "");
+  set("Л","","Λ","", "");
+  set("М","M","Μ","", "");
+  set("Н","H","","", "");
+  set("О","O","Ο","ס", "0");
+  set("П","","Π","ח", "");
+  set("Р","P","Ρ","ק", "");
+  set("С","C","","", "");
+  set("Т","T","Τ","", "");
+  set("У","Y","Υ","", "");
+  set("Ф","","Φ","", "");
+  set("Х","X","Χ","", "");
+  set("Ц","","","", "");
+  set("Ч","","","", "4");
+  set("Ш","","","ש", "");
+  set("Щ","","","", "");
+  set("Ъ","","","", "");
+  set("Ы","","","", "");
+  set("Ь","","","", "");
+  set("Э","","","", "");
+  set("Ю","","","", "");
+  set("Я","","","", "");
 
   // Строчные
-  set("а","a","α","");
-  set("б","","δ","");
-  set("в","","β","");
-  set("г","","","");
-  set("д","","","");
-  set("е","e","ε","");
-  set("ё","e","ε","");
-  set("ж","","","");
-  set("з","","","");
-  set("и","u","υ","υ");
-  set("й","","","");      // все "-"
-  set("к","k","κ","");
-  set("л","","λ","ג");
-  set("м","","μ","");
-  set("н","","","א");
-  set("о","o","ο","ס");
-  set("п","n","π","ח");
-  set("р","p","ρ","ק");
-  set("с","c","ς","");
-  set("т","m","τ","");
-  set("у","y","γ","ע");
-  set("ф","","φ","");
-  set("х","x","χ","");
-  set("ц","","","");
-  set("ч","","","");
-  set("ш","","ω","ש");
-  set("щ","","","");
-  set("ъ","","","");
-  set("ы","","","");
-  set("ь","","","");
-  set("э","","","");
-  set("ю","","","");
-  set("я","","","");
+  set("а","a","α","", "");
+  set("б","","δ","", "6");
+  set("в","","β","", "8");
+  set("г","","","", "");
+  set("д","","","", "");
+  set("е","e","ε","", "");
+  set("ё","e","ε","", "");
+  set("ж","","","", "");
+  set("з","","","", "3");
+  set("и","u","υ","υ", "");
+  set("й","","","", "");
+  set("к","k","κ","", "");
+  set("л","","λ","ג", "");
+  set("м","","μ","", "");
+  set("н","","","א", "");
+  set("о","o","ο","ס", "0");
+  set("п","n","π","ח", "");
+  set("р","p","ρ","ק", "");
+  set("с","c","ς","", "");
+  set("т","m","τ","", "");
+  set("у","y","γ","ע", "");
+  set("ф","","φ","", "");
+  set("х","x","χ","", "");
+  set("ц","","","", "");
+  set("ч","","","", "4");
+  set("ш","","ω","ש", "");
+  set("щ","","","", "");
+  set("ъ","","","", "");
+  set("ы","","","", "");
+  set("ь","","","", "");
+  set("э","","","", "");
+  set("ю","","","", "");
+  set("я","","","", "");
 
   return m;
 })();
@@ -254,19 +262,21 @@ let transformMap = {};
 
 const srcTA    = document.getElementById("src");
 const dstTA    = document.getElementById("dst");
+const cbDigits = document.getElementById("cb-digits");
 const cbGreek  = document.getElementById("cb-greek");
 const cbHebrew = document.getElementById("cb-hebrew");
 
-const selCyr = document.getElementById("sel-cyr");
-const selLat = document.getElementById("sel-lat");
-const selGr  = document.getElementById("sel-gr");
-const selHe  = document.getElementById("sel-he");
+const selCyr   = document.getElementById("sel-cyr");
+const selLat   = document.getElementById("sel-lat");
+const selGr    = document.getElementById("sel-gr");
+const selHe    = document.getElementById("sel-he");
+const selDigit = document.getElementById("sel-digit");
 
 // ===== Helpers =====
 
-function fillSelect(sel, alphabet) {
+function fillSelect(sel, list) {
   sel.innerHTML = "";
-  alphabet.forEach(ch => {
+  list.forEach(ch => {
     const opt = document.createElement("option");
     opt.value = ch;
     opt.textContent = ch === "" ? "—" : ch;
@@ -289,7 +299,12 @@ function cloneReferenceMap(src) {
   for (const k in src) {
     if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
     const v = src[k];
-    out[k] = { lat: v.lat || "", gr: v.gr || "", he: v.he || "" };
+    out[k] = {
+      lat:   v.lat   || "",
+      gr:    v.gr    || "",
+      he:    v.he    || "",
+      digit: v.digit || ""
+    };
   }
   return out;
 }
@@ -303,7 +318,7 @@ function initReferenceMapDefaults() {
     if (referenceMap[cyr]) continue;
     const lat = baseLatForCyr[cyr] || "";
     if (lat) {
-      referenceMap[cyr] = { lat, gr:"", he:"" };
+      referenceMap[cyr] = { lat, gr:"", he:"", digit:"" };
     }
   }
 }
@@ -311,22 +326,26 @@ function initReferenceMapDefaults() {
 // ===== Построение transformMap по логике чекбоксов =====
 //
 // Приоритет:
-// 1) если включён Иврит и есть he → he
-// 2) иначе если включён Греческий и есть gr → gr
-// 3) иначе если есть lat → lat
-// 4) иначе без замены
+// 1) если включены Цифры и есть digit → digit
+// 2) иначе если включён Иврит и есть he → he
+// 3) иначе если включён Греческий и есть gr → gr
+// 4) иначе если есть lat → lat
+// 5) иначе без замены
 
 function rebuildTransformMap() {
   transformMap = Object.create(null);
+  const useDigits = cbDigits.checked;
   const useGreek  = cbGreek.checked;
   const useHebrew = cbHebrew.checked;
 
   for (const cyr of alphabetCyr) {
     if (!cyr) continue;
-    const ref = referenceMap[cyr] || { lat:"", gr:"", he:"" };
+    const ref = referenceMap[cyr] || { lat:"", gr:"", he:"", digit:"" };
     let target = "";
 
-    if (useHebrew && ref.he) {
+    if (useDigits && ref.digit) {
+      target = ref.digit;
+    } else if (useHebrew && ref.he) {
       target = ref.he;
     } else if (useGreek && ref.gr) {
       target = ref.gr;
@@ -340,7 +359,7 @@ function rebuildTransformMap() {
   }
 }
 
-// ===== Добавление LRM к группам подряд идущих ивритских букв (2+ символа) =====
+// ===== Добавление LRM к группам подряд идущих ивритских букв (2+ символа) =====[web:214][web:352][web:350]
 
 function isHebrewChar(ch) {
   if (!ch) return false;
@@ -378,7 +397,7 @@ function addLrmToHebrewRuns(text) {
   return result;
 }
 
-// Перекодирование текста с использованием transformMap
+// ===== Перекодирование текста с использованием transformMap =====
 
 function runTransform() {
   const text = srcTA.value;
@@ -404,26 +423,28 @@ function runTransform() {
 function onCyrSelectChange() {
   const cyr = selCyr.value;
   if (!cyr) {
-    setSelectValue(selLat, "");
-    setSelectValue(selGr,  "");
-    setSelectValue(selHe,  "");
+    setSelectValue(selLat,   "");
+    setSelectValue(selGr,    "");
+    setSelectValue(selHe,    "");
+    setSelectValue(selDigit, "");
     return;
   }
-  const ref = referenceMap[cyr] || { lat:"", gr:"", he:"" };
-  setSelectValue(selLat, ref.lat || "");
-  setSelectValue(selGr,  ref.gr  || "");
-  setSelectValue(selHe,  ref.he  || "");
+  const ref = referenceMap[cyr] || { lat:"", gr:"", he:"", digit:"" };
+  setSelectValue(selLat,   ref.lat   || "");
+  setSelectValue(selGr,    ref.gr    || "");
+  setSelectValue(selHe,    ref.he    || "");
+  setSelectValue(selDigit, ref.digit || "");
 }
 
-// При выборе лат/гр/иврита:
+// При выборе лат/гр/иврита/цифры:
 // обновляем только соответствующее поле для активной кириллической буквы,
 // потом заново строим transformMap.
-function onLatGrHeSelectChange(script) {
+function onMapSelectChange(script) {
   const cyr = selCyr.value;
   if (!cyr) return;
 
   if (!referenceMap[cyr]) {
-    referenceMap[cyr] = { lat:"", gr:"", he:"" };
+    referenceMap[cyr] = { lat:"", gr:"", he:"", digit:"" };
   }
   const ref = referenceMap[cyr];
 
@@ -433,6 +454,8 @@ function onLatGrHeSelectChange(script) {
     ref.gr  = selGr.value || "";
   } else if (script === "he") {
     ref.he  = selHe.value || "";
+  } else if (script === "digit") {
+    ref.digit = selDigit.value || "";
   }
 
   rebuildTransformMap();
@@ -444,13 +467,15 @@ function resetAll() {
   srcTA.value = "";
   dstTA.value = "";
 
+  cbDigits.checked = false;
   cbGreek.checked  = false;
   cbHebrew.checked = false;
 
-  setSelectValue(selCyr, "");
-  setSelectValue(selLat, "");
-  setSelectValue(selGr,  "");
-  setSelectValue(selHe,  "");
+  setSelectValue(selCyr,   "");
+  setSelectValue(selLat,   "");
+  setSelectValue(selGr,    "");
+  setSelectValue(selHe,    "");
+  setSelectValue(selDigit, "");
 
   initReferenceMapDefaults();
   rebuildTransformMap();
@@ -460,7 +485,7 @@ function resetAll() {
 
 document.getElementById("btn-run").addEventListener("click", runTransform);
 
-// Кнопка обмена текстом закомментирована выше, обработчик не нужен.
+// Кнопка обмена текстом закомментирована в разметке, обработчик не нужен.
 
 // document.getElementById("btn-swap").addEventListener("click", () => {
 //   const a = srcTA.value;
@@ -470,28 +495,33 @@ document.getElementById("btn-run").addEventListener("click", runTransform);
 
 document.getElementById("btn-reset").addEventListener("click", resetAll);
 
+cbDigits.addEventListener("change", rebuildTransformMap);
 cbGreek.addEventListener("change", rebuildTransformMap);
 cbHebrew.addEventListener("change", rebuildTransformMap);
 
 selCyr.addEventListener("change", onCyrSelectChange);
-selLat.addEventListener("change", () => onLatGrHeSelectChange("lat"));
-selGr.addEventListener("change",  () => onLatGrHeSelectChange("gr"));
-selHe.addEventListener("change",  () => onLatGrHeSelectChange("he"));
+selLat.addEventListener("change",   () => onMapSelectChange("lat"));
+selGr.addEventListener("change",    () => onMapSelectChange("gr"));
+selHe.addEventListener("change",    () => onMapSelectChange("he"));
+selDigit.addEventListener("change", () => onMapSelectChange("digit"));
 
 function init() {
-  fillSelect(selCyr, alphabetCyr);
-  fillSelect(selLat, alphabetLat);
-  fillSelect(selGr,  alphabetGr);
-  fillSelect(selHe,  alphabetHe);
+  fillSelect(selCyr,   alphabetCyr);
+  fillSelect(selLat,   alphabetLat);
+  fillSelect(selGr,    alphabetGr);
+  fillSelect(selHe,    alphabetHe);
+  fillSelect(selDigit, digitsList);
 
   srcTA.value = "";
   dstTA.value = "";
+  cbDigits.checked = false;
   cbGreek.checked  = false;
   cbHebrew.checked = false;
-  setSelectValue(selCyr, "");
-  setSelectValue(selLat, "");
-  setSelectValue(selGr,  "");
-  setSelectValue(selHe,  "");
+  setSelectValue(selCyr,   "");
+  setSelectValue(selLat,   "");
+  setSelectValue(selGr,    "");
+  setSelectValue(selHe,    "");
+  setSelectValue(selDigit, "");
 
   initReferenceMapDefaults();
   rebuildTransformMap();
